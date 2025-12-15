@@ -1,11 +1,7 @@
-
 name: Random Daily Commits
-
 on:
-  # Automatic daily run at 1:00 PM CAT (UTC+2 → 11:00 UTC)
   schedule:
     - cron: "0 11 * * *"
-  # Manual trigger
   workflow_dispatch:
 
 permissions:
@@ -14,35 +10,39 @@ permissions:
 jobs:
   random-commits:
     runs-on: ubuntu-latest
-
     steps:
-      # Step 1: Checkout repo
+      # Step 1: Checkout repo with full history
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Step 2: Pick commit count (2, 3, or 5)
       - name: Pick commit count
         id: decide
         run: |
-          OPTIONS=(2 3 5)
-          INDEX=$((RANDOM % 3))
-          echo "count=${OPTIONS[$INDEX]}" >> $GITHUB_OUTPUT
+          COUNT=$((2 + RANDOM % 4))
+          if [ $COUNT -eq 4 ]; then COUNT=5; fi
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
 
-      # Step 3: Make commits
-      - name: Make commits
+      # Step 3: Configure git
+      - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          for i in $(seq 1 ${{ steps.decide.outputs.count }}); do
+      # Step 4: Make all commits (no delays)
+      - name: Make commits
+        env:
+          COMMIT_COUNT: ${{ steps.decide.outputs.count }}
+        run: |
+          for i in $(seq 1 $COMMIT_COUNT); do
             echo "Update $i on $(date -u)" >> progress.md
             git add progress.md
             git commit -m "Automated update $i"
-            sleep $((RANDOM % 180))  # random delay between commits
           done
+          git push --force-with-lease
 
-          git push
-
-      # Step 4: Optional info
+      # Step 5: Display summary
       - name: Display message
-        run: echo "Workflow complete! Committed ${{ steps.decide.outputs.count }} times today."
+        run: echo "✓ Workflow complete! Committed ${{ steps.decide.outputs.count }} times."
