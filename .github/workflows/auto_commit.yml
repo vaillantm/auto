@@ -11,38 +11,43 @@ jobs:
   random-commits:
     runs-on: ubuntu-latest
     steps:
-      # Step 1: Checkout repo with full history
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Step 2: Pick commit count (2, 3, or 5)
       - name: Pick commit count
         id: decide
         run: |
-          COUNT=$((2 + RANDOM % 4))
-          if [ $COUNT -eq 4 ]; then COUNT=5; fi
-          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          # Picks 2, 3, or 5
+          ARRAY=(2 3 5)
+          SELECTED=${ARRAY[$((RANDOM % 3))]}
+          echo "count=$SELECTED" >> $GITHUB_OUTPUT
 
-      # Step 3: Configure git
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      # Step 4: Make all commits (no delays)
       - name: Make commits
         env:
           COMMIT_COUNT: ${{ steps.decide.outputs.count }}
         run: |
+          # Ensure the file exists
+          touch progress.md
+          
           for i in $(seq 1 $COMMIT_COUNT); do
-            echo "Update $i on $(date -u)" >> progress.md
+            # Append attempt number and current date/time to the file
+            echo "Attempt $i of $COMMIT_COUNT on $(date -u +'%Y-%m-%d %H:%M:%S')" >> progress.md
+            
+            # Stage the change and commit immediately inside the loop
             git add progress.md
-            git commit -m "Automated update $i"
+            git commit -m "Automated update $i of $COMMIT_COUNT"
           done
-          git push --force-with-lease
+          
+          # Push all generated commits at once to GitHub
+          git pull --rebase origin main
+          git push origin main
 
-      # Step 5: Display summary
       - name: Display message
-        run: echo "✓ Workflow complete! Committed ${{ steps.decide.outputs.count }} times."
+        run: echo "✓ Finished! Added ${{ steps.decide.outputs.count }} lines to progress.md and pushed ${{ steps.decide.outputs.count }} commits."
