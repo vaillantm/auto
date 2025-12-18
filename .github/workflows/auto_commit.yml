@@ -3,10 +3,8 @@ on:
   schedule:
     - cron: "0 11 * * *"
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
   random-commits:
     runs-on: ubuntu-latest
@@ -15,7 +13,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Pick commit count
         id: decide
         run: |
@@ -23,33 +20,25 @@ jobs:
           ARRAY=(2 3 5)
           SELECTED=${ARRAY[$((RANDOM % 3))]}
           echo "count=$SELECTED" >> $GITHUB_OUTPUT
-
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
       - name: Make commits
         env:
           COMMIT_COUNT: ${{ steps.decide.outputs.count }}
         run: |
-          touch progress.md
-          
           for i in $(seq 1 $COMMIT_COUNT); do
-            # 1. Write the specific attempt line
-            echo "Attempt $i of $COMMIT_COUNT on $(date -u +'%Y-%m-%d %H:%M:%S')" >> progress.md
+            # Add unique content to README.md
+            echo "✓ Commit attempt $i - $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> README.md
             
-            # 2. Add and Commit immediately (This creates the 'one by one' history)
-            git add progress.md
-            git commit -m "Automated update $i of $COMMIT_COUNT"
-            
-            # 3. Small pause to ensure unique timestamps
-            sleep 5
+            # Stage and commit immediately
+            git add README.md
+            git commit -m "Daily commit $i of $COMMIT_COUNT"
           done
           
-          # 4. Final sync and push
+          # Push all commits at once
           git pull --rebase origin main
           git push origin main
-
       - name: Display message
         run: echo "✓ Finished! Successfully created ${{ steps.decide.outputs.count }} individual commits."
