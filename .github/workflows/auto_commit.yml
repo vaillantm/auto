@@ -33,21 +33,23 @@ jobs:
         env:
           COMMIT_COUNT: ${{ steps.decide.outputs.count }}
         run: |
-          # Ensure the file exists
           touch progress.md
           
           for i in $(seq 1 $COMMIT_COUNT); do
-            # Append attempt number and current date/time to the file
+            # 1. Write the specific attempt line
             echo "Attempt $i of $COMMIT_COUNT on $(date -u +'%Y-%m-%d %H:%M:%S')" >> progress.md
             
-            # Stage the change and commit immediately inside the loop
+            # 2. Add and Commit immediately (This creates the 'one by one' history)
             git add progress.md
             git commit -m "Automated update $i of $COMMIT_COUNT"
+            
+            # 3. Small pause to ensure unique timestamps
+            sleep 5
           done
           
-          # Push all generated commits at once to GitHub
+          # 4. Final sync and push
           git pull --rebase origin main
           git push origin main
 
       - name: Display message
-        run: echo "✓ Finished! Added ${{ steps.decide.outputs.count }} lines to progress.md and pushed ${{ steps.decide.outputs.count }} commits."
+        run: echo "✓ Finished! Successfully created ${{ steps.decide.outputs.count }} individual commits."
