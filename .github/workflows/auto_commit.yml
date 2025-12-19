@@ -3,8 +3,10 @@ on:
   schedule:
     - cron: "0 11 * * *"
   workflow_dispatch:
+
 permissions:
   contents: write
+
 jobs:
   random-commits:
     runs-on: ubuntu-latest
@@ -13,32 +15,68 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Pick commit count
         id: decide
         run: |
-          # Picks 2, 3, or 5
-          ARRAY=(2 3 5)
-          SELECTED=${ARRAY[$((RANDOM % 3))]}
-          echo "count=$SELECTED" >> $GITHUB_OUTPUT
+          # Picks random number between 5 and 27
+          COUNT=$((RANDOM % 23 + 5))
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          echo "Creating $COUNT commits..."
+
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Make commits
         env:
           COMMIT_COUNT: ${{ steps.decide.outputs.count }}
         run: |
-          for i in $(seq 1 $COMMIT_COUNT); do
-            # Add unique content to README.md
-            echo "✓ Commit attempt $i - $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> README.md
-            
-            # Stage and commit immediately
-            git add README.md
-            git commit -m "Daily commit $i of $COMMIT_COUNT"
-          done
+          WORD="commits"
+          FILE="word.txt"
+          CURRENT=""
+          MODE="add"
+          DONE=0
           
-          # Push all commits at once
-          git pull --rebase origin main
+          # Initialize file
+          echo "$CURRENT" > $FILE
+          git add $FILE
+          git commit -m "Random daily commit 1/$COMMIT_COUNT: $CURRENT"
+          DONE=$((DONE+1))
+          
+          while [ $DONE -lt $COMMIT_COUNT ]; do
+            if [ "$MODE" = "add" ]; then
+              # Add characters one by one
+              if [ ${#CURRENT} -lt ${#WORD} ]; then
+                CURRENT="${WORD:0:$((${#CURRENT}+1))}"
+              else
+                # Reached full word, switch to delete mode
+                MODE="delete"
+                continue
+              fi
+            else
+              # Delete characters one by one
+              if [ ${#CURRENT} -gt 0 ]; then
+                CURRENT="${CURRENT:0:$((${#CURRENT}-1))}"
+              else
+                # Reached empty string, switch to add mode
+                MODE="add"
+                continue
+              fi
+            fi
+            
+            # Write and commit
+            echo "$CURRENT" > $FILE
+            git add $FILE
+            git commit -m "Random daily commit $((DONE+1))/$COMMIT_COUNT: $CURRENT"
+            DONE=$((DONE+1))
+          done
+
+      - name: Push changes
+        run: |
+          git pull --rebase origin main || true
           git push origin main
+
       - name: Display message
-        run: echo "✓ Finished! Successfully created ${{ steps.decide.outputs.count }} individual commits."
+        run: echo "✓ Finished! Successfully created ${{ steps.decide.outputs.count }} animated commits."
