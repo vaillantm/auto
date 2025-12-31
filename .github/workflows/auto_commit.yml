@@ -1,4 +1,6 @@
+
 name: Random Daily Commits
+
 on:
   schedule:
     - cron: "0 11 * * *"
@@ -10,26 +12,68 @@ permissions:
 jobs:
   random-commits:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Pick commit count
+      - name: Decide commit count with weekly color guarantee
         id: decide
         run: |
-          # Picks random number between 5 and 27
-          COUNT=$((RANDOM % 23 + 5))
+          DAY=$(date +%u)   # 1=Mon ... 7=Sun
+          WEEK_FILE=".week_state"
+
+          LIGHT=6
+          MEDIUM=7
+          DARK=10
+          DARKEST=15
+          MAX=23
+
+          if [ ! -f "$WEEK_FILE" ] || [ "$DAY" -eq 1 ]; then
+            echo "reset" > $WEEK_FILE
+          fi
+
+          USED=$(cat $WEEK_FILE)
+
+          pick_random() {
+            ARR=(6 7 10 15 23)
+            echo ${ARR[$RANDOM % 5]}
+          }
+
+          if ! grep -q "L" <<< "$USED"; then
+            COUNT=$LIGHT
+            TAG="L"
+          elif ! grep -q "M" <<< "$USED"; then
+            COUNT=$MEDIUM
+            TAG="M"
+          elif ! grep -q "D" <<< "$USED"; then
+            COUNT=$DARK
+            TAG="D"
+          elif ! grep -q "X" <<< "$USED"; then
+            COUNT=$DARKEST
+            TAG="X"
+          else
+            COUNT=$(pick_random)
+            case $COUNT in
+              6) TAG="L";;
+              7) TAG="M";;
+              10) TAG="D";;
+              15|23) TAG="X";;
+            esac
+          fi
+
+          echo "$USED$TAG" > $WEEK_FILE
           echo "count=$COUNT" >> $GITHUB_OUTPUT
-          echo "Creating $COUNT commits..."
+          echo "Today's commits: $COUNT"
 
       - name: Configure git
         run: |
           git config user.name "vaillantm"
           git config user.email "manzivaillant@gmail.com"
 
-      - name: Make commits
+      - name: Make animated commits
         env:
           COMMIT_COUNT: ${{ steps.decide.outputs.count }}
         run: |
@@ -38,38 +82,33 @@ jobs:
           CURRENT=""
           MODE="add"
           DONE=0
-          
-          # Initialize file
+
           echo "$CURRENT" > $FILE
-          git add $FILE
-          git commit -m "Random daily commit 1/$COMMIT_COUNT: $CURRENT"
-          DONE=$((DONE+1))
-          
+          git add $FILE .week_state
+          git commit -m "Daily commit 1/$COMMIT_COUNT"
+
+          DONE=1
+
           while [ $DONE -lt $COMMIT_COUNT ]; do
             if [ "$MODE" = "add" ]; then
-              # Add characters one by one
               if [ ${#CURRENT} -lt ${#WORD} ]; then
                 CURRENT="${WORD:0:$((${#CURRENT}+1))}"
               else
-                # Reached full word, switch to delete mode
                 MODE="delete"
                 continue
               fi
             else
-              # Delete characters one by one
               if [ ${#CURRENT} -gt 0 ]; then
                 CURRENT="${CURRENT:0:$((${#CURRENT}-1))}"
               else
-                # Reached empty string, switch to add mode
                 MODE="add"
                 continue
               fi
             fi
-            
-            # Write and commit
+
             echo "$CURRENT" > $FILE
             git add $FILE
-            git commit -m "Random daily commit $((DONE+1))/$COMMIT_COUNT: $CURRENT"
+            git commit -m "Daily commit $((DONE+1))/$COMMIT_COUNT"
             DONE=$((DONE+1))
           done
 
@@ -77,6 +116,3 @@ jobs:
         run: |
           git pull --rebase origin main || true
           git push origin main
-
-      - name: Display message
-        run: echo "✓ Finished! Successfully created ${{ steps.decide.outputs.count }} animated commits."
