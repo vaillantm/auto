@@ -19,54 +19,36 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Decide commit count with weekly color guarantee
+      - name: Decide commit count with weekly quotas and ranges
         id: decide
         run: |
           DAY=$(date +%u)   # 1=Mon ... 7=Sun
           WEEK_FILE=".week_state"
 
-          LIGHT=6
-          MEDIUM=7
-          DARK=10
-          DARKEST=15
-          MAX=23
-
+          # Reset week on Monday or if state file missing
           if [ ! -f "$WEEK_FILE" ] || [ "$DAY" -eq 1 ]; then
-            echo "reset" > $WEEK_FILE
+            # 2 Darkest (X), 3 Dark (D), 1 Medium (M), 1 Light (L)
+            echo "X X D D D M L" | tr ' ' '\n' | shuf > "$WEEK_FILE"
           fi
 
-          USED=$(cat $WEEK_FILE)
+          # Take today's tag and remove it from file
+          TAG=$(head -n 1 "$WEEK_FILE")
+          tail -n +2 "$WEEK_FILE" > tmp && mv tmp "$WEEK_FILE"
 
-          pick_random() {
-            ARR=(6 7 10 15 23)
-            echo ${ARR[$RANDOM % 5]}
+          # Random number in a range
+          rand_range() {
+            echo $((RANDOM % ($2 - $1 + 1) + $1))
           }
 
-          if ! grep -q "L" <<< "$USED"; then
-            COUNT=$LIGHT
-            TAG="L"
-          elif ! grep -q "M" <<< "$USED"; then
-            COUNT=$MEDIUM
-            TAG="M"
-          elif ! grep -q "D" <<< "$USED"; then
-            COUNT=$DARK
-            TAG="D"
-          elif ! grep -q "X" <<< "$USED"; then
-            COUNT=$DARKEST
-            TAG="X"
-          else
-            COUNT=$(pick_random)
-            case $COUNT in
-              6) TAG="L";;
-              7) TAG="M";;
-              10) TAG="D";;
-              15|23) TAG="X";;
-            esac
-          fi
+          case "$TAG" in
+            L) COUNT=$(rand_range 3 5);;
+            M) COUNT=$(rand_range 6 8);;
+            D) COUNT=$(rand_range 9 12);;
+            X) COUNT=$(rand_range 13 25);;
+          esac
 
-          echo "$USED$TAG" > $WEEK_FILE
           echo "count=$COUNT" >> $GITHUB_OUTPUT
-          echo "Today's commits: $COUNT"
+          echo "Today's color: $TAG → $COUNT commits"
 
       - name: Configure git
         run: |
