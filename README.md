@@ -1,6 +1,6 @@
-# Commit Automation in `vaillantm/auto`
+# Commit Automation 
 
-The `vaillantm/auto` repository automates commit generation based on a configurable weekly schedule. This process focuses on daily commit quotas that dictate how many commits can occur each day.
+The auto repository automates commit generation based on a configurable weekly schedule. This process focuses on daily commit quotas that dictate how many commits can occur each day.
 
 ## Daily Commit Quotas
 
