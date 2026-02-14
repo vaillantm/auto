@@ -11,80 +11,23 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Decide commit count with weekly quotas and ranges
-        id: decide
-        run: |
-          DAY=$(date +%u)
-          WEEK_FILE=".week_state"
-          
-          if [ ! -f "$WEEK_FILE" ] || [ "$DAY" -eq 1 ]; then
-            echo "X X D D D M L" | tr ' ' '\n' | shuf > "$WEEK_FILE"
-          fi
-          
-          TAG=$(head -n 1 "$WEEK_FILE")
-          tail -n +2 "$WEEK_FILE" > tmp && mv tmp "$WEEK_FILE"
-          
-          rand_range() {
-            echo $((RANDOM % ($2 - $1 + 1) + $1))
-          }
-          
-          case "$TAG" in
-            L) COUNT=$(rand_range 3 5);;
-            M) COUNT=$(rand_range 6 8);;
-            D) COUNT=$(rand_range 9 12);;
-            X) COUNT=$(rand_range 13 25);;
-          esac
-          
-          echo "count=$COUNT" >> $GITHUB_OUTPUT
-          echo "Today's color: $TAG → $COUNT commits"
-      
+        
       - name: Configure git
         run: |
           git config user.name "vaillantm"
           git config user.email "manzivaillant@gmail.com"
       
-      - name: Make animated commits
-        env:
-          COMMIT_COUNT: ${{ steps.decide.outputs.count }}
+      - name: Make commits
         run: |
-          WORD="commits"
-          FILE="word.txt"
-          CURRENT=""
-          MODE="add"
-          DONE=0
+          # Random commits between 3-15
+          COUNT=$((RANDOM % 13 + 3))
+          echo "Making $COUNT commits today"
           
-          echo "$CURRENT" > $FILE
-          git add $FILE .week_state
-          git commit -m "Daily commit 1/$COMMIT_COUNT"
-          DONE=1
-          
-          while [ $DONE -lt $COMMIT_COUNT ]; do
-            if [ "$MODE" = "add" ]; then
-              if [ ${#CURRENT} -lt ${#WORD} ]; then
-                CURRENT="${WORD:0:$((${#CURRENT}+1))}"
-              else
-                MODE="delete"
-                continue
-              fi
-            else
-              if [ ${#CURRENT} -gt 0 ]; then
-                CURRENT="${CURRENT:0:$((${#CURRENT}-1))}"
-              else
-                MODE="add"
-                continue
-              fi
-            fi
-            
-            echo "$CURRENT" > $FILE
-            git add $FILE
-            git commit -m "Daily commit $((DONE+1))/$COMMIT_COUNT"
-            DONE=$((DONE+1))
+          for i in $(seq 1 $COUNT); do
+            echo "Commit $i at $(date)" >> activity.txt
+            git add activity.txt
+            git commit -m "Daily commit $i/$COUNT"
           done
       
       - name: Push changes
-        run: |
-          git push origin main
+        run: git push
