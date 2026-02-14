@@ -1,0 +1,59 @@
+name: AUTO
+on:
+  schedule:
+    - cron: "0 11 * * *"  # 1 PM Kigali time daily
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Decide commit count with weekly distribution
+        id: decide
+        run: |
+          WEEK_FILE=".week_schedule"
+          DAY=$(date +%u)  # 1=Mon, 7=Sun
+          
+          # Reset schedule every Monday or if file doesn't exist
+          if [ ! -f "$WEEK_FILE" ] || [ "$DAY" -eq 1 ]; then
+            # 3 Dark, 3 Medium, 1 Light = 7 days
+            echo "D D D M M M L" | tr ' ' '\n' | shuf > "$WEEK_FILE"
+          fi
+          
+          # Get today's intensity level
+          LEVEL=$(head -n 1 "$WEEK_FILE")
+          tail -n +2 "$WEEK_FILE" > tmp && mv tmp "$WEEK_FILE"
+          
+          # Assign commit ranges based on GitHub contribution levels
+          case "$LEVEL" in
+            L) COUNT=$((RANDOM % 3 + 3));;    # Light: 3-5 commits
+            M) COUNT=$((RANDOM % 4 + 6));;    # Medium: 6-9 commits
+            D) COUNT=$((RANDOM % 6 + 10));;   # Dark: 10-15 commits
+          esac
+          
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          echo "Today (Day $DAY): $LEVEL = $COUNT commits"
+      
+      - name: Configure git
+        run: |
+          git config user.name "vaillantm"
+          git config user.email "manzivaillant@gmail.com"
+      
+      - name: Make commits
+        run: |
+          COUNT=${{ steps.decide.outputs.count }}
+          
+          for i in $(seq 1 $COUNT); do
+            echo "$(date): Activity $i" >> activity.log
+            git add activity.log .week_schedule
+            git commit -m "Update: $(date +%Y-%m-%d) [$i/$COUNT]"
+          done
+          
+      - name: Push
+        run: git push
