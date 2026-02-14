@@ -1,60 +1,47 @@
-
 name: Random Daily Commits
-
 on:
   schedule:
     - cron: "0 11 * * *"
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
   random-commits:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Decide commit count with weekly quotas and ranges
         id: decide
         run: |
           DAY=$(date +%u)   # 1=Mon ... 7=Sun
           WEEK_FILE=".week_state"
-
           # Reset week on Monday or if state file missing
           if [ ! -f "$WEEK_FILE" ] || [ "$DAY" -eq 1 ]; then
             # 2 Darkest (X), 3 Dark (D), 1 Medium (M), 1 Light (L)
             echo "X X D D D M L" | tr ' ' '\n' | shuf > "$WEEK_FILE"
           fi
-
           # Take today's tag and remove it from file
           TAG=$(head -n 1 "$WEEK_FILE")
           tail -n +2 "$WEEK_FILE" > tmp && mv tmp "$WEEK_FILE"
-
           # Random number in a range
           rand_range() {
             echo $((RANDOM % ($2 - $1 + 1) + $1))
           }
-
           case "$TAG" in
             L) COUNT=$(rand_range 3 5);;
             M) COUNT=$(rand_range 6 8);;
             D) COUNT=$(rand_range 9 12);;
             X) COUNT=$(rand_range 13 25);;
           esac
-
           echo "count=$COUNT" >> $GITHUB_OUTPUT
           echo "Today's color: $TAG → $COUNT commits"
-
       - name: Configure git
         run: |
           git config user.name "vaillantm"
           git config user.email "manzivaillant@gmail.com"
-
       - name: Make animated commits
         env:
           COMMIT_COUNT: ${{ steps.decide.outputs.count }}
@@ -64,13 +51,10 @@ jobs:
           CURRENT=""
           MODE="add"
           DONE=0
-
           echo "$CURRENT" > $FILE
           git add $FILE .week_state
           git commit -m "Daily commit 1/$COMMIT_COUNT"
-
           DONE=1
-
           while [ $DONE -lt $COMMIT_COUNT ]; do
             if [ "$MODE" = "add" ]; then
               if [ ${#CURRENT} -lt ${#WORD} ]; then
@@ -87,13 +71,11 @@ jobs:
                 continue
               fi
             fi
-
             echo "$CURRENT" > $FILE
             git add $FILE
             git commit -m "Daily commit $((DONE+1))/$COMMIT_COUNT"
             DONE=$((DONE+1))
           done
-
       - name: Push changes
         run: |
           git pull --rebase origin main || true
